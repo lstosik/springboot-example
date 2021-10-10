@@ -1,5 +1,6 @@
 package net.purevirtual.springbootexample.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.time.LocalDateTime;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
@@ -26,6 +27,7 @@ public class ApplicationRevision {
     
     private String changeReason;
     
+    @JsonIgnore
     @ManyToOne(optional = false)
     private Application application;
     
