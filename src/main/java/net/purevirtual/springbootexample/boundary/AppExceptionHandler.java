@@ -17,7 +17,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExcep
 public class AppExceptionHandler extends ResponseEntityExceptionHandler {
     private Logger logger = LoggerFactory.getLogger(AppExceptionHandler.class);
 
-    @ExceptionHandler({InvalidRequestException.class,
+    @ExceptionHandler({InvalidRequestException.class, InvalidStatusException.class,
         ConstraintViolationException.class,
         DataIntegrityViolationException.class})
     public ResponseEntity<Object> handleBadRequest(Exception ex, WebRequest request) {

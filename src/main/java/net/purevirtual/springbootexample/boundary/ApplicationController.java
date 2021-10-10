@@ -135,7 +135,7 @@ public class ApplicationController {
     }
     
     @PutMapping("/{id}/accept")
-    public void accept(@RequestBody ContentRequest request, @PathVariable Long id) {
+    public void accept(@PathVariable Long id) {
         Application application = applicationRepository.getById(id);
         checkStatus(application, ApplicationStatus.VERIFIED);
 
