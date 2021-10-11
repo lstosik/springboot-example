@@ -1,9 +1,13 @@
 package net.purevirtual.springbootexample.boundary.dto;
 
+import javax.validation.constraints.NotBlank;
+
 public class ContentRequest {
 
+    @NotBlank
     private String title;
 
+    @NotBlank
     private String content;
 
     public String getTitle() {

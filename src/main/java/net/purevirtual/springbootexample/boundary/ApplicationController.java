@@ -2,8 +2,10 @@ package net.purevirtual.springbootexample.boundary;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import javax.validation.Valid;
 import net.purevirtual.springbootexample.boundary.dto.ContentRequest;
 import net.purevirtual.springbootexample.boundary.dto.NegativeRequest;
+import net.purevirtual.springbootexample.control.ApplicationFacade;
 import net.purevirtual.springbootexample.entity.Application;
 import net.purevirtual.springbootexample.entity.ApplicationRevision;
 import net.purevirtual.springbootexample.entity.ApplicationStatus;
@@ -14,6 +16,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
+@Validated
 @RequestMapping("/api/applications")
 public class ApplicationController {
     
@@ -38,8 +42,11 @@ public class ApplicationController {
     @Autowired
     private ApplicationRevisionRepository applicationRevisionRepository;
     
+    @Autowired
+    private ApplicationFacade applicationFacade;
+    
     @GetMapping
-    public List<Application> list(@RequestParam(defaultValue = "1", required = false) int page) {
+    public List<Application> list(@RequestParam(defaultValue = "1") int page) {
         Pageable selectedPage = selectPage(page);
         return applicationRepository.findByStatusNot(ApplicationStatus.DELETED, selectedPage);
     }
@@ -71,7 +78,7 @@ public class ApplicationController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public long create(@RequestBody ContentRequest request) {
+    public long create(@RequestBody @Valid ContentRequest request) {
         Application application = new Application();
         application.setContent(request.getContent());
         application.setTitle(request.getTitle());
@@ -81,14 +88,8 @@ public class ApplicationController {
     }
     
     @DeleteMapping("/{id}")
-    public void delete(@RequestBody NegativeRequest request, @PathVariable Long id) {
-        Application application = applicationRepository.getById(id);
-        checkStatus(application, ApplicationStatus.CREATED);
-                
-        archive(application);
-        application.setStatus(ApplicationStatus.DELETED);
-        application.setChangeReason(request.getReason());
-        applicationRepository.save(application);
+    public void delete(@RequestBody @Valid NegativeRequest request, @PathVariable Long id) {
+        applicationFacade.updateStatus(id, ApplicationStatus.DELETED, request.getReason());
     }
     
     @GetMapping("/{id}")
@@ -103,10 +104,12 @@ public class ApplicationController {
     }
     
     @PutMapping("/{id}")
-    public void update(@RequestBody ContentRequest request, @PathVariable Long id) {
+    public void update(@RequestBody @Valid ContentRequest request, @PathVariable Long id) {
         Application application = applicationRepository.getById(id);
-        checkStatus(application, ApplicationStatus.CREATED, ApplicationStatus.VERIFIED);
-        archive(application);
+        if (!application.getStatus().isContentChangeAllowed()) {
+            throw new InvalidStatusException("Application is in status "+application.getStatus()+", changing content is not allowed");
+        }
+        applicationFacade.archive(application);
 
         application.setContent(request.getContent());
         application.setTitle(request.getTitle());
@@ -114,75 +117,23 @@ public class ApplicationController {
     }
     
     @PutMapping("/{id}/reject")
-    public void reject(@RequestBody NegativeRequest request, @PathVariable Long id) {
-        Application application = applicationRepository.getById(id);
-        checkStatus(application, ApplicationStatus.VERIFIED, ApplicationStatus.ACCEPTED);
-        
-        archive(application);
-        application.setStatus(ApplicationStatus.REJECTED);
-        application.setChangeReason(request.getReason());
-        applicationRepository.save(application);
+    public void reject(@RequestBody @Valid NegativeRequest request, @PathVariable Long id) {
+        applicationFacade.updateStatus(id, ApplicationStatus.REJECTED, request.getReason());
     }
     
     @PutMapping("/{id}/verify")
     public void verify(@PathVariable Long id) {
-        Application application = applicationRepository.getById(id);
-        checkStatus(application, ApplicationStatus.CREATED);
-        
-        archive(application);        
-        application.setStatus(ApplicationStatus.VERIFIED);
-        applicationRepository.save(application);
+        applicationFacade.updateStatus(id, ApplicationStatus.VERIFIED);
     }
     
     @PutMapping("/{id}/accept")
     public void accept(@PathVariable Long id) {
-        Application application = applicationRepository.getById(id);
-        checkStatus(application, ApplicationStatus.VERIFIED);
-
-        archive(application);
-        application.setStatus(ApplicationStatus.ACCEPTED);
-        applicationRepository.save(application);
+        applicationFacade.updateStatus(id, ApplicationStatus.ACCEPTED);
     }
     
     @PutMapping("/{id}/publish")
     public void publish(@PathVariable Long id) {
-        Application application = applicationRepository.getById(id);
-        checkStatus(application, ApplicationStatus.ACCEPTED);
-        
-        archive(application);
-        application.setStatus(ApplicationStatus.PUBLISHED);
-        applicationRepository.save(application);
-    }
-
-    /**
-     * Saves the state of application before change was applied
-     * @param application 
-     */
-    private void archive(Application application) {
-        ApplicationRevision revision = new ApplicationRevision();
-        revision.setApplication(application);
-        revision.setChangeReason(application.getChangeReason());
-        revision.setContent(application.getContent());
-        revision.setTitle(application.getTitle());
-        revision.setModificationTime(application.getModificationTime());
-        applicationRevisionRepository.save(revision);
-        
-        application.setModificationTime(LocalDateTime.now());
-        revision.setChangeReason(null);
-    }
-
-    /**
-     * Verifies if application is in given state
-     * @param application
-     * @param allowedStatuses 
-     */
-    private void checkStatus(Application application, ApplicationStatus ... allowedStatuses) {
-        for (ApplicationStatus allowedStatus : allowedStatuses) {
-            if(application.getStatus() == allowedStatus) {
-                return;
-            }
-        }
-        throw new InvalidStatusException(application, allowedStatuses);
+        applicationFacade.updateStatus(id, ApplicationStatus.PUBLISHED);
     }
     
     private PageRequest selectPage(int page) {
