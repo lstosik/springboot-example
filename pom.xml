@@ -64,13 +64,21 @@
                 </dependencies>
             </plugin>
             <plugin>
-                <!-- mvn org.pitest:pitest-maven:mutationCoverage -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <version>3.0.0-M5</version>
+            </plugin>
+            <plugin>
+                <!-- Run:
+                    mvn org.pitest:pitest-maven:mutationCoverage
+                     results in target/pit-reports/index.html
+                -->
                 <groupId>org.pitest</groupId>
                 <artifactId>pitest-maven</artifactId>
                 <version>1.7.1</version>
                 <configuration>
                     <timestampedReports>false</timestampedReports>
-                    <verbose>true</verbose>
+                    <verbose>false</verbose>
                 </configuration>
                 <!--allows to work with JUnit 5-->
                 <dependencies>

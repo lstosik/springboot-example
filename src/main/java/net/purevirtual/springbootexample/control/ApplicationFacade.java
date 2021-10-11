@@ -46,6 +46,7 @@ public class ApplicationFacade {
         revision.setChangeReason(application.getChangeReason());
         revision.setContent(application.getContent());
         revision.setTitle(application.getTitle());
+        revision.setStatus(application.getStatus());
         revision.setModificationTime(application.getModificationTime());
         applicationRevisionRepository.save(revision);
         

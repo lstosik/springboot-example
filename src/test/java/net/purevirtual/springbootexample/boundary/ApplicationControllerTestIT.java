@@ -1,11 +1,13 @@
 package net.purevirtual.springbootexample.boundary;
 
 import io.restassured.RestAssured;
+import io.restassured.common.mapper.TypeRef;
 import io.restassured.response.Response;
 import java.util.List;
 import net.purevirtual.springbootexample.boundary.dto.ContentRequest;
 import net.purevirtual.springbootexample.boundary.dto.NegativeRequest;
 import net.purevirtual.springbootexample.entity.Application;
+import net.purevirtual.springbootexample.entity.ApplicationRevision;
 import net.purevirtual.springbootexample.entity.ApplicationStatus;
 import org.apache.commons.lang3.RandomStringUtils;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -38,6 +40,37 @@ public class ApplicationControllerTestIT {
         System.out.println("list");
         Response get = RestAssured.get(API_ROOT);
         List<Application> applications = get.as(List.class);
+    }
+    
+    @Test
+    public void testFind() {
+        System.out.println("find");
+        
+        TypeRef<List<Application>> resultTypeRef = new TypeRef<List<Application>>() {};
+        ContentRequest contentRequest = randomContentRequest();
+        int id = create(contentRequest);
+        assertThat(getStatus(id)).isEqualTo(ApplicationStatus.CREATED);
+        
+        //single result
+        Response get = RestAssured.get(API_ROOT+"/title/"+contentRequest.getTitle());
+        List<Application> applications = get.as(resultTypeRef);
+        assertThat(applications).hasSize(1);
+        assertThat(applications.get(0).getContent()).isEqualTo(contentRequest.getContent());
+        //no results
+        get = RestAssured.get(API_ROOT+"/title/"+contentRequest.getTitle()+"suffix");
+        applications = get.as(resultTypeRef);
+        assertThat(applications).hasSize(0);
+        
+        //single result
+        get = RestAssured.get(API_ROOT+"/title/"+contentRequest.getTitle()+"/status/CREATED");
+        applications = get.as(resultTypeRef);
+        assertThat(applications).hasSize(1);
+        assertThat(applications.get(0).getContent()).isEqualTo(contentRequest.getContent());
+        //no results
+        get = RestAssured.get(API_ROOT+"/title/"+contentRequest.getTitle()+"/status/ACCEPTED");
+        applications = get.as(resultTypeRef);
+        assertThat(applications).hasSize(0);        
+        
     }
     
     @Test
@@ -98,6 +131,12 @@ public class ApplicationControllerTestIT {
                 .put(API_ROOT+"/"+id+"/publish");
         checkHttpCode(publish);
         assertThat(getStatus(id)).isEqualTo(ApplicationStatus.PUBLISHED);
+        
+        List<ApplicationRevision> history = getHistory(id);
+        assertThat(history).hasSize(3);
+        assertThat(history.get(0).getStatus()).isEqualTo(ApplicationStatus.CREATED);
+        assertThat(history.get(1).getStatus()).isEqualTo(ApplicationStatus.VERIFIED);
+        assertThat(history.get(2).getStatus()).isEqualTo(ApplicationStatus.ACCEPTED);
     }
     
     @Test
@@ -111,7 +150,7 @@ public class ApplicationControllerTestIT {
         assertThat(getStatus(id)).isEqualTo(ApplicationStatus.CREATED);
         
         NegativeRequest negativeRequest = new NegativeRequest();
-        negativeRequest.setReason("invalid application rejected");
+        negativeRequest.setReason("invalid application canceled");
         Response delete = RestAssured.given()
                 .body(negativeRequest)
                 .contentType(MediaType.APPLICATION_JSON_VALUE)
@@ -140,6 +179,51 @@ public class ApplicationControllerTestIT {
                 .put(API_ROOT+"/"+id+"/reject");
         checkHttpCode(reject);
         assertThat(getStatus(id)).isEqualTo(ApplicationStatus.REJECTED);
+    }
+    
+    @Test
+    public void testReject_wrong_status() {
+        System.out.println("reject_wrong_status");
+        ContentRequest contentRequest = randomContentRequest();
+        
+        int id = create(contentRequest);
+        assertThat(getStatus(id)).isEqualTo(ApplicationStatus.CREATED);
+               
+        NegativeRequest negativeRequest = new NegativeRequest();
+        negativeRequest.setReason("application rejected");
+        Response reject = RestAssured.given()
+                .body(negativeRequest)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .put(API_ROOT+"/"+id+"/reject");
+        
+        assertThat(reject.getStatusCode()).isBetween(400, 499);
+        //there should be no change
+        assertThat(getStatus(id)).isEqualTo(ApplicationStatus.CREATED);
+    }
+    
+    @Test
+    public void testUpdate() {
+        System.out.println("update");
+        ContentRequest contentRequest = randomContentRequest();
+
+        int id = create(contentRequest);
+        assertThat(getStatus(id)).isEqualTo(ApplicationStatus.CREATED);
+        Application oldApplication = getApplication(id);
+        assertThat(oldApplication.getTitle()).isEqualTo(contentRequest.getTitle());
+        assertThat(oldApplication.getContent()).isEqualTo(contentRequest.getContent());
+
+        ContentRequest newContent = randomContentRequest();
+
+        Response update = RestAssured.given()
+                .body(newContent)
+                .contentType(MediaType.APPLICATION_JSON_VALUE)
+                .put(API_ROOT + "/" + id);
+        checkHttpCode(update);
+
+        Application updatedApplication = getApplication(id);
+        assertThat(getStatus(id)).isEqualTo(ApplicationStatus.CREATED);
+        assertThat(updatedApplication.getTitle()).isEqualTo(newContent.getTitle());
+        assertThat(updatedApplication.getContent()).isEqualTo(newContent.getContent());
     }
 
     private ContentRequest randomContentRequest() {
@@ -173,5 +257,11 @@ public class ApplicationControllerTestIT {
 
     private void checkHttpCode(Response get) {
         assertThat(get.getStatusCode()).isBetween(200, 299);
+    }
+    
+    private List<ApplicationRevision> getHistory(int applicationId) {       
+        TypeRef<List<ApplicationRevision>> resultTypeRef = new TypeRef<List<ApplicationRevision>>() {};
+        Response get = RestAssured.get(API_ROOT+"/"+applicationId+"/history");
+        return get.as(resultTypeRef);
     }
 }

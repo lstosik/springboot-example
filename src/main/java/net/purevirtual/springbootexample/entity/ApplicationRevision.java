@@ -12,7 +12,9 @@ import javax.persistence.ManyToOne;
 
 
 /**
- * Past states of application 
+ * Past states of application. It acts like an audit table. Alternative approach
+ * is to remove fields: "title", "content", "changeReason" and "status" 
+ * from "Application" and instead place there ID of current ApplicationRevision.
  */
 @Entity
 public class ApplicationRevision {

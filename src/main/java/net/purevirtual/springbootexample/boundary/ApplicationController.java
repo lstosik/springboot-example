@@ -100,7 +100,7 @@ public class ApplicationController {
     @GetMapping("/{id}/history")
     public List<ApplicationRevision> getHistory(@PathVariable Long id) {
         Application application = applicationRepository.getById(id);
-        return applicationRevisionRepository.findByApplication(application);
+        return applicationRevisionRepository.findByApplicationOrderByModificationTimeAsc(application);
     }
     
     @PutMapping("/{id}")
