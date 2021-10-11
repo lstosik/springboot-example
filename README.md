@@ -20,4 +20,4 @@ Applications are ordered by date of last modification.
 * [PUT] /api/applications/{id}/reject - changes status to Rejected
 * [DELETE] /api/applications/{id} - changes status to Deleted (application won't be visible in system)
 
-Sample requests in Postman format are placed in CRUD.postman_collection.json file. It assues
+Sample requests in Postman format are placed in CRUD.postman_collection.json file. It assues application running at default http://127.0.0.1:8080/
